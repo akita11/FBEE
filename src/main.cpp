@@ -30,7 +30,8 @@ float ax[X][2], ay[X][2], az[X][2];
 uint16_t p = 0;
 
 //#define MAX_ACC 1.0
-#define MAX_ACC 2.0
+//#define MAX_ACC 2.0
+#define MAX_ACC 0.1
 
 uint16_t conv_acc(float x)
 {
