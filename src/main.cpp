@@ -1,3 +1,5 @@
+// FBEE: FutureBody-ElephantEar
+
 #include <M5Unified.h>
 #include "M5_IMU_PRO.h"
 
@@ -6,8 +8,13 @@
 
 BMI270::BMI270 bmi270;
 
+#define pinBz 26
+
 #define X 320
 #define Y 240
+
+// CoreS3 + audio play
+// https://qiita.com/suzukiplan/items/ba86610d523a94775665
 
 void setup() {
 	M5.begin();
@@ -23,7 +30,82 @@ void setup() {
 	//   sens_cfg[0].cfg.acc.odr         = BMI2_ACC_ODR_400HZ;
 	//   sens_cfg[0].cfg.acc.range       = BMI2_ACC_RANGE_2G;
 
-  bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
+	bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
+
+  ledcSetup(0, 4000, 10);
+  ledcAttachPin(pinBz, 0);
+
+#if defined(ARDUINO_M5STACK_CORE2)
+	// I2S audio for Core2
+	i2s_config_t audioConfig = {
+		.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
+		.sample_rate = 44100,
+		.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+		.channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+		.communication_format = I2S_COMM_FORMAT_STAND_MSB,
+		.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+		.dma_buf_count = 4,
+		.dma_buf_len = 1024,
+		.use_apll = false,
+		.tx_desc_auto_clear = true};
+	i2s_driver_install(I2S_NUM_0, &audioConfig, 0, nullptr);
+	i2s_set_clk(I2S_NUM_0, 44100, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
+	i2s_zero_dma_buffer(I2S_NUM_0);
+
+	// write PCB data from buf (max 1024 bytes)
+	char buf[1024];
+	int bufSize = 1024;
+	size_t wrote;
+	i2s_write(I2S_NUM_0, buf, bufSize, &wrote, portMAX_DELAY);
+	vTaskDelay(2);
+#elif defined(ARDUINO_M5STACK_CORES3)
+	// I2S audio for CoreS3
+	// setup AW88298 regisgter
+	M5.In_I2C.bitOn(0x36, 0x02, 0b00000100, 400000);
+	this->writeRegister(0x61, 0x0673);
+	this->writeRegister(0x04, 0x4040);
+	this->writeRegister(0x05, 0x0008);
+	this->writeRegister(0x06, 0b0001110000000111); // I2SCTL: 44.1kHz, 16bits, monoral (他は全部デフォルト値)
+	this->writeRegister(0x0C, 0x0064);
+	// I2S config
+	i2s_config_t config;
+	memset(&config, 0, sizeof(i2s_config_t));
+	config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
+	config.sample_rate = 48000; // dummy setting
+	config.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+	config.channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT;
+	config.communication_format = I2S_COMM_FORMAT_STAND_I2S;
+	config.dma_buf_count = 4;
+	config.dma_buf_len = 1024;
+	config.tx_desc_auto_clear = true;
+	// I2S pin config
+	i2s_pin_config_t pinConfig;
+	memset(&pinConfig, ~0u, sizeof(i2s_pin_config_t));
+	pinConfig.bck_io_num = GPIO_NUM_34;
+	pinConfig.ws_io_num = GPIO_NUM_33;
+	pinConfig.data_out_num = GPIO_NUM_13;
+	// Setup I2S
+	i2s_driver_install(I2S_NUM_1, &config, 0, nullptr);
+	i2s_set_pin(I2S_NUM_1, &pinConfig);
+	i2s_zero_dma_buffer(I2S_NUM_1);
+	i2s_start(I2S_NUM_1);
+	char buf[1024];
+	int bufSize = 1024;
+	size_t wrote;
+	i2s_write(I2S_NUM_1, buf, bufSize, &wrote, portMAX_DELAY);
+	vTaskDelay(2);
+#else
+#error "no Core2 or CoreS3"
+#endif
+
+
+}
+
+void setFreq(int freq){
+	if (freq == 0) ledcWrite(0, 0);
+	else{
+		ledcWriteTone(0, freq);	
+	}
 }
 
 float ax[X][2], ay[X][2], az[X][2];
