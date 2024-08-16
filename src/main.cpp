@@ -1,3 +1,5 @@
+// FBEE: FutureBody-ElephantEar
+
 #include <M5Unified.h>
 #include "M5_IMU_PRO.h"
 
@@ -6,7 +8,8 @@
 #define BIM270_SENSOR_ADDR 0x68
 #define BMP280_SENSOR_ADDR 0x76
 BMI270::BMI270 bmi270;
-Adafruit_BMP280 bmp(&Wire);
+
+#define pinBz 26
 
 #define X 320
 #define Y 240
@@ -38,7 +41,7 @@ void setup() {
 
 uint16_t conv_acc(float x)
 {
-	uint16_t v;
+	int v;
 	v = (x + MAX_ACC) / (2 * MAX_ACC) * Y;
 	if (v < 0) v = 0;
 	else if (v > Y -1) v = Y - 1;
@@ -53,6 +56,10 @@ uint16_t p = 0;
 
 float ax0 = 0, ay0 = 0, az0 = 0;
 
+uint8_t tm = 0;
+uint32_t t1, t0; 
+uint16_t to = 0;
+float ax0 = 0, ay0 = 0, az0 = 0;
 void loop(void) {
 	float x, y, z;
 	if (bmi270.accelerationAvailable()) {
