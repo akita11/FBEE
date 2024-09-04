@@ -9,16 +9,17 @@
 #define BMP280_SENSOR_ADDR 0x76
 BMI270::BMI270 bmi270;
 
-#define pinBz 26
+#define pinBz 9 // for CoreS3SE's PortB
 
 #define X 320
 #define Y 240
 
+/*
 #define SAMPLE_RATE 1000
-#define PCM_BUF_LEN 16
+#define PCM_BUF_LEN 20000
 int16_t pcmBuf[PCM_BUF_LEN];
-uint8_t p_pcmBuf = 0;
-
+uint16_t p_pcmBuf = 0;
+*/
 
 void setup() {
 	M5.begin();
@@ -26,13 +27,15 @@ void setup() {
 	Wire.setClock(400000L); // I2C clock = 400kHz
 
 	bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
-
+/*
 	auto config = M5.Speaker.config();
 	config.sample_rate = SAMPLE_RATE;
 	M5.Speaker.config(config);
 	M5.Speaker.setVolume(255);
 	M5.Speaker.begin();
-
+*/
+	ledcSetup(0, 15000, 8); // Ch.0, 5kHz, 8bit
+  ledcAttachPin(pinBz, 0);
 }
 
 //#define MAX_ACC 1.0
@@ -55,11 +58,8 @@ float ax[X][2], ay[X][2], az[X][2];
 uint16_t p = 0;
 
 float ax0 = 0, ay0 = 0, az0 = 0;
+uint16_t val = 0;
 
-uint8_t tm = 0;
-uint32_t t1, t0; 
-uint16_t to = 0;
-float ax0 = 0, ay0 = 0, az0 = 0;
 void loop(void) {
 	float x, y, z;
 	if (bmi270.accelerationAvailable()) {
@@ -70,15 +70,24 @@ void loop(void) {
 		if (y < ay[p][1]) ay[p][1] = y;
 		if (z > az[p][0]) az[p][0] = z;
 		if (z < az[p][1]) az[p][1] = z;
-		int val;
-		val = sqrt(x * x + y * y + z * z) * 1000;
-		pcmBuf[p_pcmBuf++] = val;
+		float x0 = ax[p][0] - ax0;
+		float y0 = ay[p][0] - ay0;
+		float z0 = az[p][0] - az0;
+		float acc = sqrt(x0 * x0 + y0 * y0 + z0 * z0);
+		val = acc * 256 * 50; if (val > 255) val = 255;
+//		printf("%d\n", val);
+		ledcWrite(0, val);
+/*
+//		val = sqrt(x * x + y * y + z * z) * 1000;
+//		val = (p_pcmBuf % 100) * 16; // for test (saw wave)
+//		pcmBuf[p_pcmBuf++] = val;
+//			printf("%d %d\n", p_pcmBuf, val);
 		if (p_pcmBuf == PCM_BUF_LEN){
 			while (M5.Speaker.isPlaying()) { vTaskDelay(1); }
 			M5.Speaker.playRaw(pcmBuf, PCM_BUF_LEN, SAMPLE_RATE, false);
 			p_pcmBuf = 0;
 		}
-
+*/
 		tm++;
 		if (tm == 20){
 //			t1 = millis(); printf("%d\n", t1 - t0); t0 = t1;
