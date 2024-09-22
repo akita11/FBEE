@@ -10,6 +10,7 @@
 BMI270::BMI270 bmi270;
 
 #define pinBz 9 // for CoreS3SE's PortB
+#define pinSpk 26 // for StickC+ + SPK hat
 
 #define X 320
 #define Y 240
@@ -27,15 +28,18 @@ void setup() {
 	Wire.setClock(400000L); // I2C clock = 400kHz
 
 	bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
-/*
+/* // for Core2's I2S speaker
+
 	auto config = M5.Speaker.config();
 	config.sample_rate = SAMPLE_RATE;
 	M5.Speaker.config(config);
 	M5.Speaker.setVolume(255);
 	M5.Speaker.begin();
 */
+/* // for Piezo BZ
 	ledcSetup(0, 15000, 8); // Ch.0, 5kHz, 8bit
   ledcAttachPin(pinBz, 0);
+*/
 }
 
 //#define MAX_ACC 1.0
@@ -76,8 +80,9 @@ void loop(void) {
 		float acc = sqrt(x0 * x0 + y0 * y0 + z0 * z0);
 		val = acc * 256 * 50; if (val > 255) val = 255;
 //		printf("%d\n", val);
-		ledcWrite(0, val);
-/*
+//		ledcWrite(0, val); // for Piezo BZ
+		dacWrite(pinSpk, val); // 0-255
+/* // for Core2's I2S speaker
 //		val = sqrt(x * x + y * y + z * z) * 1000;
 //		val = (p_pcmBuf % 100) * 16; // for test (saw wave)
 //		pcmBuf[p_pcmBuf++] = val;
